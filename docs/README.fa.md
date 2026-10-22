@@ -157,6 +157,7 @@ FreelanceOps باید به فریلنسر کمک کند:
 - [Documentation Standards](DOCUMENTATION_STANDARDS.md)
 - [Pre-development Checklist](PRE_DEVELOPMENT_CHECKLIST.fa.md)
 - [Phase 1 - Problem Definition](PHASE_01_PROBLEM_DEFINITION.fa.md)
+- [MVP Definition](MVP_DEFINITION.fa.md)
 
 ## وضعیت فعلی
 
