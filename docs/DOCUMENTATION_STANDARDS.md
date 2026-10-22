@@ -443,3 +443,34 @@ Documentation باید بخشی از خود Product محسوب شود، نه ی�
 قاعده پروژه:
 
 > اگر یک Developer جدید نتواند با خواندن `/docs` بفهمد سیستم چیست، چرا ساخته شده، چگونه کار می کند و چگونه باید روی آن کار کند، Documentation کافی نیست.
+
+
+---
+
+## 21. ثبت Documentation جدید در Root README
+
+هر Documentation جدیدی که داخل `/docs` اضافه می شود باید در همان Change داخل فایل Root Repository یعنی:
+
+```text
+/README.md
+```
+
+نیز ثبت شود.
+
+برای هر Document جدید، Root `README.md` باید شامل این موارد باشد:
+
+- Relative Link به فایل
+- نام Document
+- توضیح کوتاه درباره هدف Document و اینکه برای چه کاری استفاده می شود
+
+مثال:
+
+```markdown
+- [MVP Definition](docs/MVP_DEFINITION.fa.md) — تعریف Scope نسخه اول Product و تصمیم های اصلی MVP.
+```
+
+هدف این Rule این است که Root `README.md` همیشه Index اصلی Documentationهای پروژه باقی بماند و یک Developer یا Contributor جدید بتواند بدون جستجو در Folderها، Document مناسب را پیدا کند.
+
+اضافه کردن Document جدید بدون Update کردن Root `README.md` یک Documentation Change ناقص محسوب می شود.
+
+اگر Document حذف، Rename یا Deprecated شود، Entry مربوط به آن در Root `README.md` نیز باید در همان Change اصلاح شود.
