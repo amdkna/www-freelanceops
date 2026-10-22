@@ -153,6 +153,7 @@ FreelanceOps should help freelancers:
 
 - [Product Idea](PRODUCT_IDEA.md)
 - [Product Idea - Persian](PRODUCT_IDEA.fa.md)
+- [Idea Red Team Report - Persian](IDEA_RED_TEAM.fa.md)
 - [Project Overview - Persian](README.fa.md)
 - [Documentation Standards](DOCUMENTATION_STANDARDS.md)
 
