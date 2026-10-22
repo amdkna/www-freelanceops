@@ -54,9 +54,9 @@ Status: Draft
 
 ### User Boundaries
 
-- [ ] مشخص کردن اینکه نسخه اول Single-user است یا Multi-user
-- [ ] مشخص کردن اینکه Team Support در MVP هست یا نیست
-- [ ] مشخص کردن اینکه Client Portal در MVP هست یا نیست
+- [x] مشخص کردن اینکه نسخه اول Single-user است یا Multi-user
+- [x] مشخص کردن اینکه Team Support در MVP هست یا نیست
+- [x] مشخص کردن اینکه Client Portal در MVP هست یا نیست
 
 ---
 
@@ -94,7 +94,7 @@ Status: Draft
 
 ### In Scope
 
-- [ ] مشخص کردن Featureهای قطعی MVP
+- [x] مشخص کردن Featureهای قطعی MVP
 - [ ] مشخص کردن Featureهای نسخه بعدی
 - [ ] مشخص کردن Featureهای Long-term
 
@@ -123,16 +123,16 @@ Status: Draft
 
 ### MVP Candidate
 
-- [ ] Authentication
-- [ ] Client Management
-- [ ] Service / Asset Management
-- [ ] Domain Tracking
-- [ ] SSL Tracking
-- [ ] Renewal Tracking
-- [ ] Reminder
+- [x] Authentication
+- [x] Client Management
+- [x] Service / Asset Management
+- [x] Domain Tracking
+- [x] SSL Tracking
+- [x] Renewal Tracking
+- [x] Reminder
 - [ ] Checklist
 - [ ] Documentation / Notes
-- [ ] Dashboard
+- [x] Dashboard
 
 ### MVP Review
 
