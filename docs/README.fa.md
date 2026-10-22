@@ -153,6 +153,7 @@ FreelanceOps باید به فریلنسر کمک کند:
 
 - [Product Idea - English](PRODUCT_IDEA.md)
 - [Product Idea - فارسی](PRODUCT_IDEA.fa.md)
+- [Idea Red Team Report](IDEA_RED_TEAM.fa.md)
 - [Documentation Standards](DOCUMENTATION_STANDARDS.md)
 - [Pre-development Checklist](PRE_DEVELOPMENT_CHECKLIST.fa.md)
 
