@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: Detect components
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.components.outputs.frontend }}
+      backend: ${{ steps.components.outputs.backend }}
+      compose: ${{ steps.components.outputs.compose }}
+      static: ${{ steps.components.outputs.static }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: components
+        shell: bash
+        run: |
+          if [ -f frontend/package.json ]; then echo "frontend=true" >> "$GITHUB_OUTPUT"; else echo "frontend=false" >> "$GITHUB_OUTPUT"; fi
+          if [ -f backend/go.mod ]; then echo "backend=true" >> "$GITHUB_OUTPUT"; else echo "backend=false" >> "$GITHUB_OUTPUT"; fi
+          if [ -f compose.yaml ] || [ -f compose.yml ] || [ -f docker-compose.yml ]; then echo "compose=true" >> "$GITHUB_OUTPUT"; else echo "compose=false" >> "$GITHUB_OUTPUT"; fi
+          if [ -f index.html ]; then echo "static=true" >> "$GITHUB_OUTPUT"; else echo "static=false" >> "$GITHUB_OUTPUT"; fi
+
+  static:
+    name: Validate static HTML
+    needs: detect
+    if: needs.detect.outputs.static == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check HTML structure
+        shell: python
+        run: |
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          html = Path("index.html").read_text(encoding="utf-8")
+          class Validator(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.tags = []
+              def handle_starttag(self, tag, attrs):
+                  self.tags.append(tag)
+          validator = Validator()
+          validator.feed(html)
+          assert "<!doctype html>" in html.lower(), "Missing HTML5 doctype"
+          assert {"html", "head", "title", "body"}.issubset(validator.tags), "Missing required HTML elements"
+          assert "</html>" in html.lower(), "Missing closing html tag"
+          print("Static HTML validation passed")
+      - name: Upload static site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-site
+          path: index.html
+          if-no-files-found: error
+          retention-days: 7
+
+  frontend:
+    name: Frontend / Vite
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (when configured)
+        run: npm run --if-present lint
+      - name: Test (when configured)
+        run: npm run --if-present test -- --run
+      - name: Build
+        run: npm run build
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  backend:
+    name: Backend / Go
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Format check
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then echo "$files"; exit 1; fi
+      - name: Go vet
+        run: go vet ./...
+      - name: Go test
+        run: go test ./...
+      - name: Compile
+        run: go build ./...
+
+  compose:
+    name: Validate Docker Compose
+    needs: detect
+    if: needs.detect.outputs.compose == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate service configuration
+        run: docker compose config --quiet
+
+  result:
+    name: CI / Required check
+    if: always()
+    needs: [detect, static, frontend, backend, compose]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all applicable checks passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")'
+          echo "$RESULTS" | jq -e '.detect.result == "success"'
