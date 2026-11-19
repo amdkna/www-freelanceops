@@ -2,7 +2,7 @@ name: Dependency lock and Go format
 on:
   push:
     branches: [main]
-    paths: ['backend/**', 'frontend/package.json']
+    paths: ['backend/**', 'frontend/package.json', '.github/workflows/maintenance.yml']
   workflow_dispatch:
 permissions:
   contents: write
