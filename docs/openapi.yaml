@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: FreelanceOps API
+  version: 0.1.0
+  description: >-
+    Contract for planned MVP endpoints. At this stage the Go server only implements
+    GET /health/live and GET /health/ready; all /v1 endpoints are not yet implemented.
+servers:
+  - url: /api
+    description: Browser-facing reverse proxy prefix (removed before reaching Go)
+tags:
+  - name: Health
+  - name: Auth
+  - name: Websites
+  - name: Monitoring
+  - name: Renewals
+security:
+  - cookieAuth: []
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      security: []
+      responses:
+        '200':
+          description: Service process is alive
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/auth/session:
+    get:
+      tags: [Auth]
+      operationId: getSession
+      responses:
+        '200': { description: Session status, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 1 }
+      responses:
+        '200': { description: Authenticated, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      responses:
+        '204': { description: Logged out }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/websites:
+    get:
+      tags: [Websites]
+      operationId: listWebsites
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+      responses:
+        '200': { description: Websites page, content: { application/json: { schema: { $ref: '#/components/schemas/WebsitePage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Websites]
+      operationId: createWebsite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebsiteInput' }
+      responses:
+        '201': { description: Created website, content: { application/json: { schema: { $ref: '#/components/schemas/Website' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/websites/{websiteId}:
+    parameters:
+      - { $ref: '#/components/parameters/WebsiteId' }
+    get:
+      tags: [Websites]
+      operationId: getWebsite
+      responses:
+        '200': { description: Website, content: { application/json: { schema: { $ref: '#/components/schemas/Website' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/websites/{websiteId}/incidents:
+    parameters:
+      - { $ref: '#/components/parameters/WebsiteId' }
+    get:
+      tags: [Monitoring]
+      operationId: listIncidents
+      responses:
+        '200': { description: Incidents page, content: { application/json: { schema: { $ref: '#/components/schemas/IncidentPage' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/websites/{websiteId}/checks:
+    parameters:
+      - { $ref: '#/components/parameters/WebsiteId' }
+    get:
+      tags: [Monitoring]
+      operationId: listChecks
+      responses:
+        '200': { description: Checks page, content: { application/json: { schema: { $ref: '#/components/schemas/CheckPage' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/websites/{websiteId}/renewals:
+    parameters:
+      - { $ref: '#/components/parameters/WebsiteId' }
+    get:
+      tags: [Renewals]
+      operationId: listRenewals
+      responses:
+        '200': { description: Renewals page, content: { application/json: { schema: { $ref: '#/components/schemas/RenewalPage' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/renewals/{renewalId}/confirm:
+    parameters:
+      - name: renewalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Renewals]
+      operationId: confirmRenewal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expires_at]
+              properties:
+                expires_at: { $ref: '#/components/schemas/UtcDateTime' }
+      responses:
+        '200': { description: Updated renewal, content: { application/json: { schema: { $ref: '#/components/schemas/Renewal' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: freelanceops_session
+  parameters:
+    WebsiteId:
+      name: websiteId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+  responses:
+    BadRequest:
+      description: Validation failed
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    Unauthorized:
+      description: Unauthenticated or session expired
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    NotFound:
+      description: Resource not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    Unavailable:
+      description: Temporarily unavailable
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+  schemas:
+    UtcDateTime:
+      type: string
+      format: date-time
+      description: RFC3339 timestamp in UTC with a trailing Z (never local time)
+      example: '2026-11-19T09:00:00Z'
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok, not_ready] }
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string }
+            details: { type: object, additionalProperties: { type: string } }
+        request_id: { type: string }
+    Session:
+      type: object
+      required: [authenticated]
+      properties:
+        authenticated: { type: boolean }
+    WebsiteInput:
+      type: object
+      additionalProperties: false
+      required: [name, url]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        url: { type: string, format: uri, pattern: '^https?://' }
+        domain_expires_at: { allOf: [ { $ref: '#/components/schemas/UtcDateTime' } ], nullable: true }
+        ssl_expires_at: { allOf: [ { $ref: '#/components/schemas/UtcDateTime' } ], nullable: true }
+    Website:
+      allOf:
+        - { $ref: '#/components/schemas/WebsiteInput' }
+        - type: object
+          required: [id, status, created_at]
+          properties:
+            id: { type: string, format: uuid }
+            status: { type: string, enum: [up, down, unknown] }
+            created_at: { $ref: '#/components/schemas/UtcDateTime' }
+    Incident:
+      type: object
+      required: [id, website_id, started_at, resolved_at]
+      properties:
+        id: { type: string, format: uuid }
+        website_id: { type: string, format: uuid }
+        started_at: { $ref: '#/components/schemas/UtcDateTime' }
+        resolved_at: { allOf: [ { $ref: '#/components/schemas/UtcDateTime' } ], nullable: true }
+    Check:
+      type: object
+      required: [id, website_id, checked_at, success, status_code]
+      properties:
+        id: { type: string, format: uuid }
+        website_id: { type: string, format: uuid }
+        checked_at: { $ref: '#/components/schemas/UtcDateTime' }
+        success: { type: boolean }
+        status_code: { type: integer, minimum: 100, maximum: 599, nullable: true }
+    Renewal:
+      type: object
+      required: [id, website_id, kind, expires_at, confirmed_at]
+      properties:
+        id: { type: string, format: uuid }
+        website_id: { type: string, format: uuid }
+        kind: { type: string, enum: [domain, ssl] }
+        expires_at: { $ref: '#/components/schemas/UtcDateTime' }
+        confirmed_at: { allOf: [ { $ref: '#/components/schemas/UtcDateTime' } ], nullable: true }
+    WebsitePage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Website' } }
+        next_cursor: { type: string, nullable: true }
+    IncidentPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Incident' } }
+        next_cursor: { type: string, nullable: true }
+    CheckPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Check' } }
+        next_cursor: { type: string, nullable: true }
+    RenewalPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Renewal' } }
+        next_cursor: { type: string, nullable: true }
