@@ -1,0 +1,103 @@
+name: Deploy FreelanceOps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freelanceops-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy on self-hosted runner
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 20
+    env:
+      DEPLOY_DIR: /opt/apps/freelanceops
+      COMPOSE_PROJECT_NAME: freelanceops
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check runner prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Runner host: $(hostname)"
+          echo "Deployment directory: $DEPLOY_DIR"
+          command -v docker
+          docker info >/dev/null
+          docker compose version
+          test -f compose.yaml
+          if ! docker network inspect app-net >/dev/null 2>&1; then
+            echo "::error::Docker network 'app-net' is missing on this runner host. Create it on the target server first: docker network create app-net"
+            exit 1
+          fi
+          if [ -e "$DEPLOY_DIR" ] && [ ! -d "$DEPLOY_DIR" ]; then
+            echo "::error::$DEPLOY_DIR exists but is not a directory"
+            exit 1
+          fi
+          mkdir -p "$DEPLOY_DIR" || {
+            echo "::error::Runner needs write access to $DEPLOY_DIR. Prepare its ownership on the target server."
+            exit 1
+          }
+          test -w "$DEPLOY_DIR" || {
+            echo "::error::Runner cannot write to $DEPLOY_DIR"
+            exit 1
+          }
+
+      - name: Copy application to deployment directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep local .env, runtime data and any other server-only files.
+          # Do not copy the checkout's Git metadata or GitHub Actions files.
+          tar --exclude='./.git' --exclude='./.github' --exclude='./.env' \
+              -cf - -C "$GITHUB_WORKSPACE" . | tar -xf - -C "$DEPLOY_DIR"
+          cd "$DEPLOY_DIR"
+          docker compose -f compose.yaml config --quiet
+
+      - name: Build and start containers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          docker compose -f compose.yaml up --detach --build --remove-orphans
+
+      - name: Check container health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in freelanceops-api freelanceops-web; do
+            echo "Checking health: $name"
+            healthy=false
+            for attempt in $(seq 1 45); do
+              status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$name" 2>/dev/null || true)"
+              if [ "$status" = healthy ]; then
+                healthy=true
+                break
+              fi
+              if [ "$status" = unhealthy ] || [ "$status" = exited ]; then
+                echo "::error::$name is $status"
+                docker logs --tail 80 "$name" || true
+                exit 1
+              fi
+              sleep 4
+            done
+            if [ "$healthy" != true ]; then
+              echo "::error::$name did not become healthy in time"
+              docker logs --tail 80 "$name" || true
+              exit 1
+            fi
+          done
+          cd "$DEPLOY_DIR"
+          docker compose -f compose.yaml ps
+          echo "Deployed commit: $GITHUB_SHA"
