@@ -1,5 +1,8 @@
 name: Dependency lock and Go format
 on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'frontend/package.json']
   workflow_dispatch:
 permissions:
   contents: write
