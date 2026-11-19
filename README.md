@@ -44,6 +44,8 @@ This keeps `README.md` as the main index for all project documentation.
 - [Frontend and REST API foundation](docs/FRONTEND_API_FOUNDATION.md) — T02/T03 setup, current API coverage, validation and deployment notes.
 - [OpenAPI contract](docs/openapi.yaml) — planned typed REST endpoints and error schemas.
 
+- [Database, authentication and operational guide](docs/DB_AUTH_OPERATIONS.md) — SQLite/WAL migrations, first-admin bootstrap, CSRF/session lifecycle, backups, and CI commands.
+
 ## Status
 
 Product definition and MVP planning.

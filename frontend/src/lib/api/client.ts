@@ -23,12 +23,12 @@ export const api = {
   health: () => request<Health>('/health/ready'),
   session: () => request<Session>('/v1/auth/session'),
   login: (password: string) => request<Session>('/v1/auth/login', {method:'POST',body:JSON.stringify({password})}),
-  logout: () => request<void>('/v1/auth/logout',{method:'POST'}),
+  logout: (csrf: string) => request<void>('/v1/auth/logout',{method:'POST',headers:{'X-CSRF-Token':csrf}}),
   websites: (cursor?: string) => request<Page<Website>>('/v1/websites'+(cursor?'?cursor='+encode(cursor):'')),
   website: (id: string) => request<Website>('/v1/websites/'+encode(id)),
-  createWebsite: (data: WebsiteInput) => { validateWebsiteInput(data); return request<Website>('/v1/websites',{method:'POST',body:JSON.stringify(data)}) },
+  createWebsite: (data: WebsiteInput, csrf: string) => { validateWebsiteInput(data); return request<Website>('/v1/websites',{method:'POST',headers:{'X-CSRF-Token':csrf},body:JSON.stringify(data)}) },
   incidents: (id: string) => request<Page<Incident>>('/v1/websites/'+encode(id)+'/incidents'),
   checks: (id: string) => request<Page<Check>>('/v1/websites/'+encode(id)+'/checks'),
   renewals: (id: string) => request<Page<Renewal>>('/v1/websites/'+encode(id)+'/renewals'),
-  confirmRenewal: (id: string, expires_at: string) => request<Renewal>('/v1/renewals/'+encode(id)+'/confirm',{method:'POST',body:JSON.stringify({expires_at})})
+  confirmRenewal: (id: string, expires_at: string, csrf: string) => request<Renewal>('/v1/renewals/'+encode(id)+'/confirm',{method:'POST',headers:{'X-CSRF-Token':csrf},body:JSON.stringify({expires_at})})
 }

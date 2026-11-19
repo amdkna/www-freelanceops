@@ -3,8 +3,8 @@ info:
   title: FreelanceOps API
   version: 0.1.0
   description: >-
-    Contract for planned MVP endpoints. At this stage the Go server only implements
-    GET /health/live and GET /health/ready; all /v1 endpoints are not yet implemented.
+    Health and single-admin authentication are implemented. Website, monitoring and renewal
+    endpoints currently return 501 after authentication and CSRF checks.
 servers:
   - url: /api
     description: Browser-facing reverse proxy prefix (removed before reaching Go)
@@ -65,6 +65,9 @@ paths:
         '200': { description: Authenticated, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /v1/auth/logout:
     post:
       tags: [Auth]
@@ -72,6 +75,7 @@ paths:
       responses:
         '204': { description: Logged out }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/websites:
     get:
       tags: [Websites]
@@ -183,6 +187,12 @@ components:
     NotFound:
       description: Resource not found
       content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    Forbidden:
+      description: Invalid origin or CSRF token
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    RateLimited:
+      description: Too many login attempts
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
     Unavailable:
       description: Temporarily unavailable
       content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
@@ -211,9 +221,10 @@ components:
         request_id: { type: string }
     Session:
       type: object
-      required: [authenticated]
+      required: [authenticated, csrf_token]
       properties:
         authenticated: { type: boolean }
+        csrf_token: { type: string, description: Session-scoped token for X-CSRF-Token on mutation requests }
     WebsiteInput:
       type: object
       additionalProperties: false
