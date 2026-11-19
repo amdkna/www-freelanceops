@@ -13,65 +13,76 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    name: Build images on GitHub runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build application images
+        run: |
+          set -euo pipefail
+          docker compose -f compose.yaml build
+          docker save freelanceops-api:local freelanceops-web:local | gzip -1 > images.tar.gz
+      - name: Publish images for deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: freelanceops-images
+          path: images.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+
   deploy:
     name: Deploy on self-hosted runner
+    needs: build
     runs-on: [self-hosted, linux, x64]
     timeout-minutes: 20
     env:
       DEPLOY_DIR: /opt/apps/freelanceops
       COMPOSE_PROJECT_NAME: freelanceops
-
     steps:
       - name: Check out source
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-
+      - name: Download prebuilt images
+        uses: actions/download-artifact@v4
+        with:
+          name: freelanceops-images
+          path: ${{ runner.temp }}/freelanceops-images
       - name: Check runner prerequisites
         shell: bash
         run: |
           set -euo pipefail
-          echo "Runner host: $(hostname)"
-          echo "Deployment directory: $DEPLOY_DIR"
           command -v docker
           docker info >/dev/null
           docker compose version
           test -f compose.yaml
-          if ! docker network inspect app-net >/dev/null 2>&1; then
-            echo "::error::Docker network 'app-net' is missing on this runner host. Create it on the target server first: docker network create app-net"
-            exit 1
-          fi
-          if [ -e "$DEPLOY_DIR" ] && [ ! -d "$DEPLOY_DIR" ]; then
-            echo "::error::$DEPLOY_DIR exists but is not a directory"
-            exit 1
-          fi
-          mkdir -p "$DEPLOY_DIR" || {
-            echo "::error::Runner needs write access to $DEPLOY_DIR. Prepare its ownership on the target server."
-            exit 1
-          }
-          test -w "$DEPLOY_DIR" || {
-            echo "::error::Runner cannot write to $DEPLOY_DIR"
-            exit 1
-          }
-
-      - name: Copy application to deployment directory
+          docker network inspect app-net >/dev/null
+          mkdir -p "$DEPLOY_DIR"
+          test -w "$DEPLOY_DIR"
+      - name: Load verified image artifact
         shell: bash
         run: |
           set -euo pipefail
-          # Keep local .env, runtime data and any other server-only files.
-          # Do not copy the checkout's Git metadata or GitHub Actions files.
-          tar --exclude='./.git' --exclude='./.github' --exclude='./.env' \
-              -cf - -C "$GITHUB_WORKSPACE" . | tar -xf - -C "$DEPLOY_DIR"
+          gzip -t "${{ runner.temp }}/freelanceops-images/images.tar.gz"
+          gzip -dc "${{ runner.temp }}/freelanceops-images/images.tar.gz" | docker load
+      - name: Copy deployment files without overwriting secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude='./.git' --exclude='./.github' --exclude='./.env' --exclude='./.env.*' --exclude='./data' --exclude='./images.tar.gz' \
+            -cf - -C "$GITHUB_WORKSPACE" . | tar -xf - -C "$DEPLOY_DIR"
           cd "$DEPLOY_DIR"
           docker compose -f compose.yaml config --quiet
-
-      - name: Build and start containers
+      - name: Start prebuilt containers
         shell: bash
         run: |
           set -euo pipefail
           cd "$DEPLOY_DIR"
-          docker compose -f compose.yaml up --detach --build --remove-orphans
-
+          docker compose -f compose.yaml up -d --no-build --remove-orphans
       - name: Check container health
         shell: bash
         run: |
@@ -81,10 +92,7 @@ jobs:
             healthy=false
             for attempt in $(seq 1 45); do
               status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$name" 2>/dev/null || true)"
-              if [ "$status" = healthy ]; then
-                healthy=true
-                break
-              fi
+              if [ "$status" = healthy ]; then healthy=true; break; fi
               if [ "$status" = unhealthy ] || [ "$status" = exited ]; then
                 echo "::error::$name is $status"
                 docker logs --tail 80 "$name" || true
@@ -98,6 +106,5 @@ jobs:
               exit 1
             fi
           done
-          cd "$DEPLOY_DIR"
-          docker compose -f compose.yaml ps
+          docker compose -f "$DEPLOY_DIR/compose.yaml" ps
           echo "Deployed commit: $GITHUB_SHA"
